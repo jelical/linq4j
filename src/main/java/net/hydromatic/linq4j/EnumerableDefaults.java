@@ -114,7 +114,7 @@ public abstract class EnumerableDefaults {
    */
   public static <TSource> boolean any(Enumerable<TSource> enumerable,
       Predicate1<TSource> predicate) {
-    throw Extensions.todo();
+    return where(enumerable,predicate).enumerator().moveNext();
   }
 
   /**
@@ -453,7 +453,10 @@ public abstract class EnumerableDefaults {
    * by Enumerable.)
    */
   public static <TSource> TSource first(Enumerable<TSource> enumerable) {
-    throw Extensions.todo();
+      final Enumerator<TSource> enumerator = enumerable.enumerator();
+      if(!enumerator.moveNext())
+          throw Extensions.noitems();
+      return enumerator.current();
   }
 
   /**
@@ -462,7 +465,7 @@ public abstract class EnumerableDefaults {
    */
   public static <TSource> TSource first(Enumerable<TSource> enumerable,
       Predicate1<TSource> predicate) {
-    throw Extensions.todo();
+    return first(where(enumerable, predicate));
   }
 
   /**
@@ -471,7 +474,10 @@ public abstract class EnumerableDefaults {
    */
   public static <TSource> TSource firstOrDefault(
       Enumerable<TSource> enumerable) {
-    throw Extensions.todo();
+      final Enumerator<TSource> enumerator = enumerable.enumerator();
+      if(!enumerator.moveNext())
+          return null;
+      return enumerator.current();
   }
 
   /**
@@ -481,7 +487,7 @@ public abstract class EnumerableDefaults {
    */
   public static <TSource> TSource firstOrDefault(Enumerable<TSource> enumerable,
       Predicate1<TSource> predicate) {
-    throw Extensions.todo();
+      return firstOrDefault(where(enumerable, predicate));
   }
 
   /**

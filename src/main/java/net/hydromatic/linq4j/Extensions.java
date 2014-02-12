@@ -219,6 +219,10 @@ public abstract class Extensions {
     return new RuntimeException();
   }
 
+  public static RuntimeException noitems() {
+      return new RuntimeException("noitems");
+  }
+
   public static <T> Queryable<T> asQueryable(DefaultEnumerable<T> source) {
     //noinspection unchecked
     return source instanceof Queryable
