@@ -528,7 +528,7 @@ public abstract class Expressions {
   public static ConstantExpression constant(Object value) {
     Class type;
     if (value == null) {
-      type = Object.class;
+      return ConstantUntypedNull.INSTANCE;
     } else {
       final Class clazz = value.getClass();
       final Primitive primitive = Primitive.ofBox(clazz);
@@ -710,8 +710,8 @@ public abstract class Expressions {
   }
 
   /**
-   * Creates a DynamicExpression that represents a dynamic
-   * operation bound by the provided CallSiteBinder, using varargs.
+   * Creates a {@code DynamicExpression} that represents a dynamic
+   * operation bound by the provided {@code CallSiteBinder}, using varargs.
    */
   public static DynamicExpression dynamic(CallSiteBinder binder, Type type,
       Expression... expression) {
@@ -719,7 +719,7 @@ public abstract class Expressions {
   }
 
   /**
-   * Creates an ElementInit, given an Iterable<T> as the second
+   * Creates an {@code ElementInit}, given an {@code Iterable<T>} as the second
    * argument.
    */
   public static ElementInit elementInit(Method method,
@@ -955,6 +955,29 @@ public abstract class Expressions {
   public static ConditionalStatement ifThenElse(Expression test, Node ifTrue,
       Node ifFalse) {
     return new ConditionalStatement(Arrays.<Node>asList(test, ifTrue, ifFalse));
+  }
+
+  /**
+   * Creates a ConditionalExpression that represents a conditional
+   * block with if and else statements:
+   * <code>if (test) stmt1 [ else if (test2) stmt2 ]... [ else stmtN ]</code>.
+   */
+  public static ConditionalStatement ifThenElse(Expression test,
+      Node... nodes) {
+    return ifThenElse(new FluentArrayList<Node>().append(test)
+        .appendAll(nodes));
+  }
+
+  /**
+   * Creates a ConditionalExpression that represents a conditional
+   * block with if and else statements:
+   * <code>if (test) stmt1 [ else if (test2) stmt2 ]... [ else stmtN ]</code>.
+   */
+  public static ConditionalStatement ifThenElse(Iterable<? extends Node>
+                                                    nodes) {
+    List<Node> list = toList(nodes);
+    assert list.size() >= 2 : "At least one test and one statement is required";
+    return new ConditionalStatement(list);
   }
 
   /**
@@ -1475,11 +1498,19 @@ public abstract class Expressions {
     final Type type;
     switch (ternaryType) {
     case Conditional:
-      type = isConstantNull(e1)
-          ? box(e2.getType())
-          : isConstantNull(e2)
-          ? box(e1.getType())
-          : Types.gcd(e1.getType(), e2.getType());
+      if (e1 instanceof ConstantUntypedNull) {
+        type = box(e2.getType());
+        if (e1.getType() != type) {
+          e1 = constant(null, type);
+        }
+      } else if (e2 instanceof ConstantUntypedNull) {
+        type = box(e1.getType());
+        if (e2.getType() != type) {
+          e2 = constant(null, type);
+        }
+      } else {
+        type = Types.gcd(e1.getType(), e2.getType());
+      }
       break;
     default:
       type = e1.getType();
@@ -3063,7 +3094,16 @@ public abstract class Expressions {
     }
     final List<Statement> statements1 = new ArrayList<Statement>();
     for (Statement statement : statements) {
-      statements1.add(statement.accept(visitor));
+      Statement newStatement = statement.accept(visitor);
+      if (newStatement instanceof GotoStatement) {
+        GotoStatement goto_ = (GotoStatement) newStatement;
+        if (goto_.kind == GotoExpressionKind.Sequence
+            && goto_.expression == null) {
+          // ignore empty statements
+          continue;
+        }
+      }
+      statements1.add(newStatement);
     }
     return statements1;
   }

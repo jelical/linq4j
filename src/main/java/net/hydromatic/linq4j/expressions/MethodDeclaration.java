@@ -17,9 +17,11 @@
 */
 package net.hydromatic.linq4j.expressions;
 
+import net.hydromatic.linq4j.function.Function1;
+import net.hydromatic.linq4j.function.Functions;
+
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.AbstractList;
 import java.util.List;
 
 /**
@@ -34,6 +36,10 @@ public class MethodDeclaration extends MemberDeclaration {
 
   public MethodDeclaration(int modifier, String name, Type resultType,
       List<ParameterExpression> parameters, BlockStatement body) {
+    assert name != null : "name should not be null";
+    assert resultType != null : "resultType should not be null";
+    assert parameters != null : "parameters should not be null";
+    assert body != null : "body should not be null";
     this.modifier = modifier;
     this.name = name;
     this.resultType = resultType;
@@ -43,9 +49,10 @@ public class MethodDeclaration extends MemberDeclaration {
 
   @Override
   public MemberDeclaration accept(Visitor visitor) {
+    visitor = visitor.preVisit(this);
     // do not visit parameters
     final BlockStatement body = this.body.accept(visitor);
-    return visitor.visit(this, parameters, body);
+    return visitor.visit(this, body);
   }
 
   public void accept(ExpressionWriter writer) {
@@ -54,17 +61,60 @@ public class MethodDeclaration extends MemberDeclaration {
     if (!modifiers.isEmpty()) {
       writer.append(' ');
     }
-    writer.append(resultType).append(' ').append(name).list("(", ", ", ")",
-        new AbstractList<String>() {
-          public String get(int index) {
-            return parameters.get(index).declString();
-          }
-
-          public int size() {
-            return parameters.size();
-          }
-        }).append(' ').append(body);
+    writer
+        .append(resultType)
+        .append(' ')
+        .append(name)
+        .list("(", ", ", ")",
+            Functions.adapt(parameters,
+                new Function1<ParameterExpression, String>() {
+                  public String apply(ParameterExpression a0) {
+                    return a0.declString();
+                  }
+                }))
+        .append(' ')
+        .append(body);
     writer.newlineAndIndent();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    MethodDeclaration that = (MethodDeclaration) o;
+
+    if (modifier != that.modifier) {
+      return false;
+    }
+    if (!body.equals(that.body)) {
+      return false;
+    }
+    if (!name.equals(that.name)) {
+      return false;
+    }
+    if (!parameters.equals(that.parameters)) {
+      return false;
+    }
+    if (!resultType.equals(that.resultType)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = modifier;
+    result = 31 * result + name.hashCode();
+    result = 31 * result + resultType.hashCode();
+    result = 31 * result + parameters.hashCode();
+    result = 31 * result + body.hashCode();
+    return result;
   }
 }
 

@@ -32,34 +32,70 @@ import java.util.List;
  * </p>
  */
 public class ConditionalStatement extends Statement {
-  private final List<Node> expressionList;
+  public final List<Node> expressionList;
 
   public ConditionalStatement(List<Node> expressionList) {
     super(ExpressionType.Conditional, Void.TYPE);
+    assert expressionList != null : "expressionList should not be null";
     this.expressionList = expressionList;
   }
 
   @Override
-  public ConditionalStatement accept(Visitor visitor) {
+  public Statement accept(Visitor visitor) {
+    visitor = visitor.preVisit(this);
     List<Node> list = Expressions.acceptNodes(expressionList, visitor);
-    if (!list.equals(expressionList)) {
-      return new ConditionalStatement(list);
-    }
-    return this;
+    return visitor.visit(this, list);
   }
 
   @Override
   void accept0(ExpressionWriter writer) {
-    for (int i = 0; i < expressionList.size(); i += 2) {
-      writer.append(i > 0 ? " else if (" : "if (")
+    for (int i = 0; i < expressionList.size() - 1; i += 2) {
+      if (i > 0) {
+        writer.backUp();
+        writer.append(" else ");
+      }
+      writer.append("if (")
           .append(expressionList.get(i))
           .append(") ")
           .append(Blocks.toBlock(expressionList.get(i + 1)));
     }
     if (expressionList.size() % 2 == 1) {
-      writer.append(" else ").append(Blocks.toBlock(expressionList.get(
-          expressionList.size() - 1)));
+      writer.backUp();
+      writer.append(" else ")
+          .append(Blocks.toBlock(last(expressionList)));
     }
+  }
+
+  private static <E> E last(List<E> collection) {
+    return collection.get(collection.size() - 1);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+
+    ConditionalStatement that = (ConditionalStatement) o;
+
+    if (!expressionList.equals(that.expressionList)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = super.hashCode();
+    result = 31 * result + expressionList.hashCode();
+    return result;
   }
 }
 

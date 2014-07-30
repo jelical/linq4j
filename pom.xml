@@ -5,7 +5,7 @@
   <groupId>net.hydromatic</groupId>
   <artifactId>linq4j</artifactId>
   <packaging>jar</packaging>
-  <version>0.1.14-FIXED</version>
+  <version>0.5-FIXED</version>
 
   <!-- More project information. -->
   <name>linq4j</name>
@@ -51,6 +51,11 @@
       <url>http://conjars.org/repo</url>
       <layout>default</layout>
     </repository>
+    <site>
+      <id>linq4j.website</id>
+      <name>Linq4j Website</name>
+      <url>file:/home/jhyde/linq4j</url>
+    </site>
   </distributionManagement>
 
   <issueManagement>
@@ -154,7 +159,14 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-release-plugin</artifactId>
-        <version>2.4.1</version>
+        <version>2.4.2</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.maven.scm</groupId>
+            <artifactId>maven-scm-provider-gitexe</artifactId>
+            <version>1.8.1</version>
+          </dependency>
+        </dependencies>
       </plugin>
 <!--
       <plugin>
@@ -169,6 +181,17 @@
       </plugin>
 -->
     </plugins>
+
+    <resources>
+      <resource>
+        <directory>${top.dir}</directory>
+        <targetPath>META-INF</targetPath>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE</include>
+        </includes>
+      </resource>
+    </resources>
   </build>
 
   <!--<reporting>-->

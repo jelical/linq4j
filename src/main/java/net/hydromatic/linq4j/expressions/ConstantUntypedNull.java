@@ -18,46 +18,33 @@
 package net.hydromatic.linq4j.expressions;
 
 /**
- * Represents a catch statement in a try block.
+ * Represents a constant null of unknown type
+ * Java allows type inference for such nulls, thus "null" cannot always be
+ * replaced to (Object)null and vise versa.
+ *
+ * ConstantExpression(null, Object.class) is not equal to ConstantUntypedNull
+ * However, optimizers might treat all the nulls equal (e.g. in case of
+ * comparison).
  */
-public class CatchBlock {
-  public final ParameterExpression parameter;
-  public final Statement body;
+public class ConstantUntypedNull extends ConstantExpression {
+  public static final ConstantExpression INSTANCE = new ConstantUntypedNull();
 
-  public CatchBlock(ParameterExpression parameter,
-      Statement body) {
-    this.parameter = parameter;
-    this.body = body;
+  private ConstantUntypedNull() {
+    super(Object.class, null);
+  }
+
+  @Override
+  void accept(ExpressionWriter writer, int lprec, int rprec) {
+    writer.append("null");
   }
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-
-    CatchBlock that = (CatchBlock) o;
-
-    if (body != null ? !body.equals(that.body) : that.body != null) {
-      return false;
-    }
-    if (parameter != null ? !parameter.equals(that.parameter) : that
-        .parameter != null) {
-      return false;
-    }
-
-    return true;
+    return o == INSTANCE;
   }
 
   @Override
   public int hashCode() {
-    int result = parameter != null ? parameter.hashCode() : 0;
-    result = 31 * result + (body != null ? body.hashCode() : 0);
-    return result;
+    return ConstantUntypedNull.class.hashCode();
   }
 }
-
-// End CatchBlock.java

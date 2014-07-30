@@ -26,12 +26,15 @@ public class WhileStatement extends Statement {
 
   public WhileStatement(Expression condition, Statement body) {
     super(ExpressionType.While, Void.TYPE);
+    assert condition != null : "condition should not be null";
+    assert body != null : "body should not be null";
     this.condition = condition;
     this.body = body;
   }
 
   @Override
   public Statement accept(Visitor visitor) {
+    visitor = visitor.preVisit(this);
     final Expression condition1 = condition.accept(visitor);
     final Statement body1 = body.accept(visitor);
     return visitor.visit(this, condition1, body1);
@@ -41,6 +44,38 @@ public class WhileStatement extends Statement {
   void accept0(ExpressionWriter writer) {
     writer.append("while (").append(condition).append(") ").append(
         Blocks.toBlock(body));
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+
+    WhileStatement that = (WhileStatement) o;
+
+    if (!body.equals(that.body)) {
+      return false;
+    }
+    if (!condition.equals(that.condition)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = super.hashCode();
+    result = 31 * result + condition.hashCode();
+    result = 31 * result + body.hashCode();
+    return result;
   }
 }
 

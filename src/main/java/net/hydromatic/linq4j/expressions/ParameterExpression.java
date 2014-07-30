@@ -19,22 +19,27 @@ package net.hydromatic.linq4j.expressions;
 
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents a named parameter expression.
  */
 public class ParameterExpression extends Expression {
-  private static int seq = 0;
+  private static final AtomicInteger SEQ = new AtomicInteger();
 
   public final int modifier;
   public final String name;
 
   public ParameterExpression(Type type) {
-    this(0, type, "p" + seq++);
+    this(0, type, "p" + SEQ.getAndIncrement());
   }
 
   public ParameterExpression(int modifier, Type type, String name) {
     super(ExpressionType.Parameter, type);
+    assert name != null : "name should not be null";
+    assert Character.isJavaIdentifierStart(name.charAt(0))
+      : "parameter name should be valid java identifier: "
+        + name + ". The first character is invalid.";
     this.modifier = modifier;
     this.name = name;
   }
@@ -64,6 +69,16 @@ public class ParameterExpression extends Expression {
         + Types.className(type)
         + " "
         + name;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    return this == o;
+  }
+
+  @Override
+  public int hashCode() {
+    return System.identityHashCode(this);
   }
 }
 

@@ -21,12 +21,14 @@ import net.hydromatic.linq4j.*;
 import net.hydromatic.linq4j.expressions.*;
 import net.hydromatic.linq4j.function.*;
 
+import com.example.Linq4jExample;
+
 import org.junit.Test;
 
 import java.util.*;
 
+import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
-
 
 /**
  * Tests for LINQ4J.
@@ -180,6 +182,46 @@ public class Linq4jTest {
     assertEquals(2, count);
   }
 
+  @Test public void testAllPredicate() {
+    Predicate1<Employee> allEmpnoGE100 = new Predicate1<Employee>() {
+      public boolean apply(Employee emp) {
+        return emp.empno >= 100;
+      }
+    };
+
+    Predicate1<Employee> allEmpnoGT100 = new Predicate1<Employee>() {
+      public boolean apply(Employee emp) {
+        return emp.empno > 100;
+      }
+    };
+
+    assertTrue(Linq4j.asEnumerable(emps).all(allEmpnoGE100));
+    assertFalse(Linq4j.asEnumerable(emps).all(allEmpnoGT100));
+  }
+
+  @Test public void testAny() {
+    List<Employee> emptyList = Collections.<Employee>emptyList();
+    assertFalse(Linq4j.asEnumerable(emptyList).any());
+    assertTrue(Linq4j.asEnumerable(emps).any());
+  }
+
+  @Test public void testAnyPredicate() {
+    Predicate1<Department> deptoNameIT = new Predicate1<Department>() {
+      public boolean apply(Department v1) {
+        return v1.name != null && v1.name.equals("IT");
+      }
+    };
+
+    Predicate1<Department> deptoNameSales = new Predicate1<Department>() {
+      public boolean apply(Department v1) {
+        return v1.name != null && v1.name.equals("Sales");
+      }
+    };
+
+    assertFalse(Linq4j.asEnumerable(depts).any(deptoNameIT));
+    assertTrue(Linq4j.asEnumerable(depts).any(deptoNameSales));
+  }
+
   @Test public void testAverageSelector() {
     assertEquals(
         20,
@@ -314,6 +356,128 @@ public class Linq4jTest {
             .toList().toString());
   }
 
+  @Test public void testContains() {
+    Employee e = emps[1];
+    Employee employeeClone = new Employee(e.empno, e.name, e.deptno);
+    Employee employeeOther = badEmps[0];
+
+    assertEquals(e, employeeClone);
+    assertTrue(Linq4j.asEnumerable(emps).contains(e));
+    assertTrue(Linq4j.asEnumerable(emps).contains(employeeClone));
+    assertFalse(Linq4j.asEnumerable(emps).contains(employeeOther));
+
+  }
+
+  @Test public void testContainsWithEqualityComparer() {
+    EqualityComparer<Employee> compareByEmpno =
+            new EqualityComparer<Employee>() {
+        public boolean equal(Employee e1, Employee e2) {
+          return e1 != null && e2 != null
+                  && e1.empno == e2.empno;
+        }
+
+        public int hashCode(Employee t) {
+          return t == null ? 0x789d : t.hashCode();
+        }
+      };
+
+    Employee e = emps[1];
+    Employee employeeClone = new Employee(e.empno, e.name, e.deptno);
+    Employee employeeOther = badEmps[0];
+
+    assertEquals(e, employeeClone);
+    assertTrue(Linq4j.asEnumerable(emps)
+            .contains(e, compareByEmpno));
+    assertTrue(Linq4j.asEnumerable(emps)
+            .contains(employeeClone, compareByEmpno));
+    assertFalse(Linq4j.asEnumerable(emps)
+            .contains(employeeOther, compareByEmpno));
+
+  }
+
+  @Test public void testFirst() {
+    Employee e = emps[0];
+    assertEquals(e, emps[0]);
+    assertEquals(e, Linq4j.asEnumerable(emps).first());
+
+    Department d = depts[0];
+    assertEquals(d, depts[0]);
+    assertEquals(d, Linq4j.asEnumerable(depts).first());
+
+    try {
+      String s = Linq4j.<String>emptyEnumerable().first();
+      fail("expected exception, got " + s);
+    } catch (NoSuchElementException ex) {
+      // ok
+    }
+
+    // close occurs if first throws
+    final int[] closeCount = {0};
+    try {
+      String s = myEnumerable(closeCount, 0).first();
+      fail("expected exception, got " + s);
+    } catch (NoSuchElementException ex) {
+      // ok
+    }
+    assertThat(closeCount[0], equalTo(1));
+
+    // close occurs if first does not throw
+    closeCount[0] = 0;
+    final String s = myEnumerable(closeCount, 1).first();
+    assertThat(s, equalTo("x"));
+    assertThat(closeCount[0], equalTo(1));
+  }
+
+  private Enumerable<String> myEnumerable(final int[] closes, final int size) {
+    return new AbstractEnumerable<String>() {
+      public Enumerator<String> enumerator() {
+        return new Enumerator<String>() {
+          int i = 0;
+
+          public String current() {
+            return "x";
+          }
+
+          public boolean moveNext() {
+            return i++ < size;
+          }
+
+          public void reset() {
+          }
+
+          public void close() {
+            ++closes[0];
+          }
+        };
+      }
+    };
+  }
+
+  @Test public void testFirstPredicate1() {
+    Predicate1<String> startWithS = new Predicate1<String>() {
+      public boolean apply(String s) {
+        return s != null && Character.toString(s.charAt(0)).equals("S");
+      }
+    };
+
+    Predicate1<Integer> numberGT15 = new Predicate1<Integer>() {
+      public boolean apply(Integer i) {
+        return i > 15;
+      }
+    };
+
+    String[] people = {"Brill", "Smith", "Simpsom"};
+    String[] peopleWithoutCharS = {"Brill", "Andrew", "Alice"};
+    Integer[] numbers = {5, 10, 15, 20, 25};
+
+    assertEquals(people[1], Linq4j.asEnumerable(people).first(startWithS));
+    assertEquals(numbers[3], Linq4j.asEnumerable(numbers).first(numberGT15));
+
+    // FIXME: What we need return if no one element is satisfied?
+    assertNull(Linq4j.asEnumerable(peopleWithoutCharS).first(startWithS));
+
+  }
+
   @SuppressWarnings("UnnecessaryBoxing")
   @Test public void testIdentityEqualityComparer() {
     final Integer one = new Integer(1);
@@ -332,8 +496,7 @@ public class Linq4jTest {
               public Object apply(Employee a0) {
                 return a0.deptno;
               }
-            }
-      );
+            });
     assertTrue(comparer.equal(emps[0], emps[0]));
     assertEquals(comparer.hashCode(emps[0]), comparer.hashCode(emps[0]));
 
@@ -410,8 +573,7 @@ public class Linq4jTest {
                   public String apply(Integer v1, String v2) {
                     return v1 + ": " + v2;
                   }
-                }
-        )
+                })
             .orderBy(Functions.<String>identitySelector())
             .toList()
             .toString();
@@ -449,6 +611,38 @@ public class Linq4jTest {
     assertEquals(
         "<no key>: Fred+Bill+Eric+Janet",
         s);
+  }
+
+  @Test public void testEmptyEnumerable() {
+    final Enumerable<Object> enumerable = Linq4j.emptyEnumerable();
+    assertThat(enumerable.any(), is(false));
+    assertThat(enumerable.longCount(), equalTo(0L));
+    final Enumerator<Object> enumerator = enumerable.enumerator();
+    assertThat(enumerator.moveNext(), is(false));
+  }
+
+  @Test public void testSingletonEnumerable() {
+    final Enumerable<String> enumerable = Linq4j.singletonEnumerable("foo");
+    assertThat(enumerable.any(), is(true));
+    assertThat(enumerable.longCount(), equalTo(1L));
+    final Enumerator<String> enumerator = enumerable.enumerator();
+    assertThat(enumerator.moveNext(), is(true));
+    assertThat(enumerator.current(), equalTo("foo"));
+    assertThat(enumerator.moveNext(), is(false));
+  }
+
+  @Test public void testSingletonEnumerator() {
+    final Enumerator<String> enumerator = Linq4j.singletonEnumerator("foo");
+    assertThat(enumerator.moveNext(), is(true));
+    assertThat(enumerator.current(), equalTo("foo"));
+    assertThat(enumerator.moveNext(), is(false));
+  }
+
+  @Test public void testSingletonNullEnumerator() {
+    final Enumerator<String> enumerator = Linq4j.singletonNullEnumerator();
+    assertThat(enumerator.moveNext(), is(true));
+    assertThat(enumerator.current(), nullValue());
+    assertThat(enumerator.moveNext(), is(false));
   }
 
   @Test public void testCast() {
@@ -620,8 +814,8 @@ public class Linq4jTest {
                     return buf.append("] work(s) in ").append(v1.name)
                         .toString();
                   }
-                }
-        ).toList()
+                })
+            .toList()
             .toString();
     assertEquals(
         "[[Fred, Eric, Janet] work(s) in Sales, "
@@ -654,6 +848,97 @@ public class Linq4jTest {
         + "Eric works in Sales, "
         + "Fred works in Sales, "
         + "Janet works in Sales]",
+        s);
+  }
+
+  @Test public void testLeftJoin() {
+    // Note #1: Left join means emit nulls on RHS but not LHS.
+    //   Employees with bad departments are not eliminated;
+    //   departments with no employees are eliminated.
+    // Note #2: Order of employees is preserved.
+    String s =
+        Linq4j.asEnumerable(emps)
+            .concat(Linq4j.asEnumerable(badEmps))
+            .join(
+                Linq4j.asEnumerable(depts),
+                EMP_DEPTNO_SELECTOR,
+                DEPT_DEPTNO_SELECTOR,
+                new Function2<Employee, Department, String>() {
+                  public String apply(Employee v1, Department v2) {
+                    return v1.name + " works in "
+                        + (v2 == null ? null : v2.name);
+                  }
+                }, null, false, true)
+            .orderBy(Functions.<String>identitySelector())
+            .toList()
+            .toString();
+    assertEquals(
+        "[Bill works in Marketing, "
+        + "Cedric works in null, "
+        + "Eric works in Sales, "
+        + "Fred works in Sales, "
+        + "Janet works in Sales]",
+        s);
+  }
+
+  @Test public void testRightJoin() {
+    // Note #1: Left join means emit nulls on LHS but not RHS.
+    //   Employees with bad departments are eliminated;
+    //   departments with no employees are not eliminated.
+    // Note #2: Order of employees is preserved.
+    String s =
+        Linq4j.asEnumerable(emps)
+            .concat(Linq4j.asEnumerable(badEmps))
+            .join(
+                Linq4j.asEnumerable(depts),
+                EMP_DEPTNO_SELECTOR,
+                DEPT_DEPTNO_SELECTOR,
+                new Function2<Employee, Department, String>() {
+                  public String apply(Employee v1, Department v2) {
+                    return (v1 == null ? null : v1.name)
+                        + " works in " + (v2 == null ? null : v2.name);
+                  }
+                }, null, true, false)
+            .orderBy(Functions.<String>identitySelector())
+            .toList()
+            .toString();
+    assertEquals(
+        "[Bill works in Marketing, "
+        + "Eric works in Sales, "
+        + "Fred works in Sales, "
+        + "Janet works in Sales, "
+        + "null works in HR]",
+        s);
+  }
+
+  @Test public void testFullJoin() {
+    // Note #1: Full join means emit nulls both LHS and RHS.
+    //   Employees with bad departments are not eliminated;
+    //   departments with no employees are not eliminated.
+    // Note #2: Order of employees is preserved.
+    String s =
+        Linq4j.asEnumerable(emps)
+            .concat(Linq4j.asEnumerable(badEmps))
+            .join(
+                Linq4j.asEnumerable(depts),
+                EMP_DEPTNO_SELECTOR,
+                DEPT_DEPTNO_SELECTOR,
+                new Function2<Employee, Department, String>() {
+                  public String apply(Employee v1, Department v2) {
+                    return (v1 == null ? null : v1.name)
+                        + " works in " + (v2 == null ? null : v2.name);
+                  }
+                }, null, true, true)
+            .orderBy(Functions.<String>identitySelector())
+            .toList()
+            .toString();
+    assertEquals(
+        "[Bill works in Marketing, "
+        + "Cedric works in null, "
+        + "Eric works in Sales, "
+        + "Fred works in Sales, "
+        + "Janet works in Sales, "
+        + "null works in HR]",
         s);
   }
 
@@ -745,8 +1030,7 @@ public class Linq4jTest {
                       public boolean apply(Employee v1) {
                         return v1.deptno == 10;
                       }
-                    }
-          ));
+                    }));
     assertEquals(3, nh2.count());
 
     // use lambda, this time call whereN
@@ -1127,6 +1411,10 @@ public class Linq4jTest {
     assertNotNull(result.toString());
   }
 
+  @Test public void testExample() {
+    Linq4jExample.main(new String[0]);
+  }
+
   public static class Employee {
     public final int empno;
     public final String name;
@@ -1140,6 +1428,44 @@ public class Linq4jTest {
 
     public String toString() {
       return "Employee(name: " + name + ", deptno:" + deptno + ")";
+    }
+
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = 1;
+      result = prime * result + deptno;
+      result = prime * result + empno;
+      result = prime * result + ((name == null) ? 0 : name.hashCode());
+      return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null) {
+        return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
+      Employee other = (Employee) obj;
+      if (deptno != other.deptno) {
+        return false;
+      }
+      if (empno != other.empno) {
+        return false;
+      }
+      if (name == null) {
+        if (other.name != null) {
+          return false;
+        }
+      } else if (!name.equals(other.name)) {
+        return false;
+      }
+      return true;
     }
   }
 

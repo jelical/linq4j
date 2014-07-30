@@ -907,9 +907,8 @@ public class ExpressionTest {
     BlockStatement expression = statements.toBlock();
     assertEquals(
         "{\n"
-        + "  final java.util.Comparator comparator = null;\n"
         + "  return new java.util.TreeSet(\n"
-        + "      comparator).add(null);\n"
+        + "      (java.util.Comparator) null).add(null);\n"
         + "}\n",
         Expressions.toString(expression));
     expression.accept(new Visitor());
@@ -1045,11 +1044,32 @@ public class ExpressionTest {
     assertEquals(
         "if (true) {\n"
         + "  return;\n"
+        + "} else {\n"
+        + "  return 1;\n"
         + "}\n",
         Expressions.toString(
-            Expressions.ifThen(
+            Expressions.ifThenElse(
                 Expressions.constant(true),
-                Expressions.return_(null))));
+                Expressions.return_(null),
+                Expressions.return_(null, Expressions.constant(1)))));
+  }
+
+  @Test public void testIfElseIfElse() {
+    assertEquals(
+        "if (true) {\n"
+        + "  return;\n"
+        + "} else if (false) {\n"
+        + "  return;\n"
+        + "} else {\n"
+        + "  return 1;\n"
+        + "}\n",
+        Expressions.toString(
+            Expressions.ifThenElse(
+                Expressions.constant(true),
+                Expressions.return_(null),
+                Expressions.constant(false),
+                Expressions.return_(null),
+                Expressions.return_(null, Expressions.constant(1)))));
   }
 
   /** Test for common sub-expression elimination. */
@@ -1067,7 +1087,7 @@ public class ExpressionTest {
                 Expressions.constant(4)), Short.class));
     Expression v0 = builder.append(
         "v0",
-        Expressions.convert_(v, Integer.class));
+        Expressions.convert_(v, Number.class));
     Expression v1 = builder.append(
         "v1",
         Expressions.convert_(
@@ -1076,7 +1096,7 @@ public class ExpressionTest {
                 Expressions.constant(4)), Short.class));
     Expression v2 = builder.append(
         "v2",
-        Expressions.convert_(v, Integer.class));
+        Expressions.convert_(v, Number.class));
     Expression v3 = builder.append(
         "v3",
         Expressions.convert_(
@@ -1085,7 +1105,7 @@ public class ExpressionTest {
                 Expressions.constant(4)), Short.class));
     Expression v4 = builder.append(
         "v4",
-        Expressions.convert_(v3, Integer.class));
+        Expressions.convert_(v3, Number.class));
     Expression v5 = builder.append("v5", Expressions.call(v4, "intValue"));
     Expression v6 = builder.append(
         "v6",
@@ -1096,8 +1116,9 @@ public class ExpressionTest {
     builder.add(Expressions.return_(null, v6));
     assertEquals(
         "{\n"
-        + "  final Integer v0 = (Integer) (Short) ((Object[]) p)[4];\n"
-        + "  return v0 == null ? null : v0.intValue() == 1997;\n"
+        + "  final Short v = (Short) ((Object[]) p)[4];\n"
+        + "  return (Number) v == null ? (Boolean) null : ("
+        + "(Number) v).intValue() == 1997;\n"
         + "}\n",
         Expressions.toString(builder.toBlock()));
   }

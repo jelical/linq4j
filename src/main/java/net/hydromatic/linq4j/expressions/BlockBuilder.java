@@ -18,6 +18,7 @@
 package net.hydromatic.linq4j.expressions;
 
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.*;
 
 /**
@@ -28,7 +29,16 @@ import java.util.*;
 public class BlockBuilder {
   final List<Statement> statements = new ArrayList<Statement>();
   final Set<String> variables = new HashSet<String>();
+  /** Contains final-fine-to-reuse-declarations.
+   * An entry to this map is added when adding final declaration of a
+   * statement with optimize=true parameter. */
+  final Map<Expression, DeclarationStatement> expressionForReuse =
+      new HashMap<Expression, DeclarationStatement>();
+
   private final boolean optimizing;
+  private final BlockBuilder parent;
+
+  private static final Visitor OPTIMIZE_VISITOR = new OptimizeVisitor();
 
   /**
    * Creates a non-optimizing BlockBuilder.
@@ -43,7 +53,17 @@ public class BlockBuilder {
    * @param optimizing Whether to eliminate common sub-expressions
    */
   public BlockBuilder(boolean optimizing) {
+    this(optimizing, null);
+  }
+
+  /**
+   * Creates a BlockBuilder.
+   *
+   * @param optimizing Whether to eliminate common sub-expressions
+   */
+  public BlockBuilder(boolean optimizing, BlockBuilder parent) {
     this.optimizing = optimizing;
+    this.parent = parent;
   }
 
   /**
@@ -52,6 +72,7 @@ public class BlockBuilder {
   public void clear() {
     statements.clear();
     variables.clear();
+    expressionForReuse.clear();
   }
 
   /**
@@ -85,7 +106,7 @@ public class BlockBuilder {
     }
     Expression result = null;
     final Map<ParameterExpression, Expression> replacements =
-        new HashMap<ParameterExpression, Expression>();
+        new IdentityHashMap<ParameterExpression, Expression>();
     final Visitor visitor = new SubstituteVariableVisitor(replacements);
     for (int i = 0; i < block.statements.size(); i++) {
       Statement statement = block.statements.get(i);
@@ -101,7 +122,11 @@ public class BlockBuilder {
               declaration.initializer);
           statement = null;
           result = x;
-          replacements.put(declaration.parameter, x);
+          if (declaration.parameter != x) {
+            // declaration.parameter can be equal to x if exactly the same
+            // declaration was present in BlockBuilder
+            replacements.put(declaration.parameter, x);
+          }
         } else {
           add(statement);
         }
@@ -115,8 +140,7 @@ public class BlockBuilder {
           statements.remove(statements.size() - 1);
           result = append_(name, ((GotoStatement) statement).expression,
               optimize);
-          if (result instanceof ParameterExpression
-              || result instanceof ConstantExpression) {
+          if (isSimpleExpression(result)) {
             // already simple; no need to declare a variable or
             // even to evaluate the expression
           } else {
@@ -171,25 +195,15 @@ public class BlockBuilder {
 
   private Expression append_(String name, Expression expression,
       boolean optimize) {
-    // We treat "1" and "null" as atoms, but not "(Comparator) null".
-    if (expression instanceof ParameterExpression
-        || (expression instanceof ConstantExpression
-            && (((ConstantExpression) expression).value != null
-                || expression.type == Object.class))) {
+    if (isSimpleExpression(expression)) {
       // already simple; no need to declare a variable or
       // even to evaluate the expression
       return expression;
     }
-    if (optimizing) {
-      for (Statement statement : statements) {
-        if (statement instanceof DeclarationStatement) {
-          DeclarationStatement decl = (DeclarationStatement) statement;
-          if ((decl.modifiers & Modifier.FINAL) != 0
-              && decl.initializer != null
-              && decl.initializer.equals(expression)) {
-            return decl.parameter;
-          }
-        }
+    if (optimizing && optimize) {
+      DeclarationStatement decl = getComputedExpression(expression);
+      if (decl != null) {
+        return decl.parameter;
       }
     }
     DeclarationStatement declare = Expressions.declare(Modifier.FINAL, newName(
@@ -198,13 +212,76 @@ public class BlockBuilder {
     return declare.parameter;
   }
 
+  /**
+   * Checks if experssion is simple enough for always inline
+   * @param expr expression to test
+   * @return true when given expression is safe to always inline
+   */
+  protected boolean isSimpleExpression(Expression expr) {
+    if (expr instanceof ParameterExpression
+        || expr instanceof ConstantExpression) {
+      return true;
+    }
+    if (expr instanceof UnaryExpression) {
+      UnaryExpression una = (UnaryExpression) expr;
+      return una.getNodeType() == ExpressionType.Convert
+          && isSimpleExpression(una.expression);
+    }
+    return false;
+  }
+
+  protected boolean isSafeForReuse(DeclarationStatement decl) {
+    return (decl.modifiers & Modifier.FINAL) != 0;
+  }
+
+  protected void addExpressionForReuse(DeclarationStatement decl) {
+    if (isSafeForReuse(decl)) {
+      Expression expr = normalizeDeclaration(decl);
+      expressionForReuse.put(expr, decl);
+    }
+  }
+
+  /**
+   * Prepares declaration for inlining: adds cast
+   * @param decl inlining candidate
+   * @return normalized expression
+   */
+  private Expression normalizeDeclaration(DeclarationStatement decl) {
+    Expression expr = decl.initializer;
+    Type declType = decl.parameter.getType();
+    if (expr == null) {
+      expr = Expressions.constant(null, declType);
+    } else if (expr.getType() != declType) {
+      expr = Expressions.convert_(expr, declType);
+    }
+    return expr;
+  }
+
+  /**
+   * Returns the reference to ParameterExpression if given expression was
+   * already computed and stored to local variable
+   * @param expr expression to test
+   * @return existing ParameterExpression or null
+   */
+  public DeclarationStatement getComputedExpression(Expression expr) {
+    if (parent != null) {
+      DeclarationStatement decl = parent.getComputedExpression(expr);
+      if (decl != null) {
+        return decl;
+      }
+    }
+    return optimizing ? expressionForReuse.get(expr) : null;
+  }
+
   public void add(Statement statement) {
     statements.add(statement);
     if (statement instanceof DeclarationStatement) {
-      String name = ((DeclarationStatement) statement).parameter.name;
+      DeclarationStatement decl = (DeclarationStatement) statement;
+      String name = decl.parameter.name;
       if (!variables.add(name)) {
         throw new AssertionError("duplicate variable " + name);
       }
+      addExpressionForReuse(decl);
     }
   }
 
@@ -217,7 +294,15 @@ public class BlockBuilder {
    */
   public BlockStatement toBlock() {
     if (optimizing) {
-      optimize();
+      // We put an artificial limit of 10 iterations just to prevent an endless
+      // loop. Optimize should not loop forever, however it is hard to prove if
+      // it always finishes in reasonable time.
+      for (int i = 0; i < 10; i++) {
+        if (!optimize(createOptimizeVisitor(), true)) {
+          break;
+        }
+      }
+      optimize(createFinishingOptimizeVisitor(), false);
     }
     return Expressions.block(statements);
   }
@@ -225,35 +310,45 @@ public class BlockBuilder {
   /**
    * Optimizes the list of statements. If an expression is used only once,
    * it is inlined.
+   *
+   * @return whether any optimizations were made
    */
-  private void optimize() {
-    List<Slot> slots = new ArrayList<Slot>();
+  private boolean optimize(Visitor optimizer, boolean performInline) {
+    int optimizeCount = 0;
     final UseCounter useCounter = new UseCounter();
     for (Statement statement : statements) {
-      if (statement instanceof DeclarationStatement) {
-        final Slot slot = new Slot((DeclarationStatement) statement);
-        useCounter.map.put(slot.parameter, slot);
-        slots.add(slot);
+      if (statement instanceof DeclarationStatement && performInline) {
+        DeclarationStatement decl = (DeclarationStatement) statement;
+        useCounter.map.put(decl.parameter, new Slot());
+      }
+      // We are added only counters up to current statement.
+      // It is fine to count usages as the latter declarations cannot be used
+      // in more recent statements.
+      if (!useCounter.map.isEmpty()) {
+        statement.accept(useCounter);
       }
     }
-    for (Statement statement : statements) {
-      statement.accept(useCounter);
-    }
     final Map<ParameterExpression, Expression> subMap =
-        new HashMap<ParameterExpression, Expression>();
+        new IdentityHashMap<ParameterExpression, Expression>(
+            useCounter.map.size());
     final SubstituteVariableVisitor visitor = new SubstituteVariableVisitor(
         subMap);
     final ArrayList<Statement> oldStatements = new ArrayList<Statement>(
         statements);
     statements.clear();
+
     for (Statement oldStatement : oldStatements) {
       if (oldStatement instanceof DeclarationStatement) {
         DeclarationStatement statement = (DeclarationStatement) oldStatement;
         final Slot slot = useCounter.map.get(statement.parameter);
-        int count = slot.count;
-        if (Expressions.isConstantNull(slot.expression)) {
-          // Don't allow 'final Type t = null' to be inlined. There
-          // is an implicit cast.
+        int count = slot == null ? Integer.MAX_VALUE - 10 : slot.count;
+        if (count > 1 && isSimpleExpression(statement.initializer)) {
+          // Inline simple final constants
+          count = 1;
+        }
+        if (!isSafeForReuse(statement)) {
+          // Don't inline variables that are not final. They might be assigned
+          // more than once.
           count = 100;
         }
         if (statement.parameter.name.startsWith("_")) {
@@ -262,39 +357,91 @@ public class BlockBuilder {
           //   final int _count = collection.size();
           //   foo(collection);
           //   return collection.size() - _count;
-          count = 100;
+          count = Integer.MAX_VALUE;
         }
-        if (slot.expression instanceof NewExpression
-            && ((NewExpression) slot.expression).memberDeclarations != null) {
+        if (statement.initializer instanceof NewExpression
+            && ((NewExpression) statement.initializer).memberDeclarations
+                != null) {
           // Don't inline anonymous inner classes. Janino gets
           // confused referencing variables from deeply nested
           // anonymous classes.
-          count = 100;
+          count = Integer.MAX_VALUE;
         }
+        Expression normalized = normalizeDeclaration(statement);
+        expressionForReuse.remove(normalized);
         switch (count) {
         case 0:
           // Only declared, never used. Throw away declaration.
           break;
         case 1:
           // declared, used once. inline it.
-          subMap.put(slot.parameter, slot.expression);
+          subMap.put(statement.parameter, normalized);
           break;
         default:
-          statements.add(statement);
+          Statement beforeOptimize = oldStatement;
+          if (!subMap.isEmpty()) {
+            oldStatement = oldStatement.accept(visitor); // remap
+          }
+          oldStatement = oldStatement.accept(optimizer);
+          if (beforeOptimize != oldStatement) {
+            ++optimizeCount;
+            if (count != Integer.MAX_VALUE
+                && oldStatement instanceof DeclarationStatement
+                && isSafeForReuse((DeclarationStatement) oldStatement)
+                && isSimpleExpression(
+                  ((DeclarationStatement) oldStatement).initializer)) {
+              // Allow to inline the expression that became simple after
+              // optimizations.
+              DeclarationStatement newDecl =
+                  (DeclarationStatement) oldStatement;
+              subMap.put(newDecl.parameter, normalizeDeclaration(newDecl));
+              oldStatement = OptimizeVisitor.EMPTY_STATEMENT;
+            }
+          }
+          if (oldStatement != OptimizeVisitor.EMPTY_STATEMENT) {
+            if (oldStatement instanceof DeclarationStatement) {
+              addExpressionForReuse((DeclarationStatement) oldStatement);
+            }
+            statements.add(oldStatement);
+          }
           break;
         }
       } else {
-        statements.add(oldStatement.accept(visitor));
+        Statement beforeOptimize = oldStatement;
+        if (!subMap.isEmpty()) {
+          oldStatement = oldStatement.accept(visitor); // remap
+        }
+        oldStatement = oldStatement.accept(optimizer);
+        if (beforeOptimize != oldStatement) {
+          ++optimizeCount;
+        }
+        if (oldStatement != OptimizeVisitor.EMPTY_STATEMENT) {
+          statements.add(oldStatement);
+        }
       }
     }
-    if (!subMap.isEmpty()) {
-      oldStatements.clear();
-      oldStatements.addAll(statements);
-      statements.clear();
-      for (Statement oldStatement : oldStatements) {
-        statements.add(oldStatement.accept(visitor));
-      }
-    }
+    return optimizeCount > 0;
+  }
+
+  /**
+   * Creates a visitor that will be used during block optimization.
+   * Subclasses might provide more specific optimizations (e.g. partial
+   * evaluation).
+   *
+   * @return visitor used to optimize the statements when converting to block
+   */
+  protected Visitor createOptimizeVisitor() {
+    return OPTIMIZE_VISITOR;
+  }
+
+  /**
+   * Creates a final optimization visitor.
+   * Typically, the visitor will factor out constant expressions.
+   *
+   * @return visitor that is used to finalize the optimization
+   */
+  protected Visitor createFinishingOptimizeVisitor() {
+    return ClassDeclarationFinder.create();
   }
 
   /**
@@ -315,12 +462,15 @@ public class BlockBuilder {
   public String newName(String suggestion) {
     int i = 0;
     String candidate = suggestion;
-    for (;;) {
-      if (!variables.contains(candidate)) {
-        return candidate;
-      }
+    while (hasVariable(candidate)) {
       candidate = suggestion + (i++);
     }
+    return candidate;
+  }
+
+  public boolean hasVariable(String name) {
+    return variables.contains(name)
+        || (parent != null && parent.hasVariable(name));
   }
 
   public BlockBuilder append(Expression expression) {
@@ -356,12 +506,44 @@ public class BlockBuilder {
       }
       return super.visit(parameterExpression);
     }
+
+    @Override
+    public Expression visit(UnaryExpression unaryExpression, Expression
+        expression) {
+      if (unaryExpression.getNodeType().modifiesLvalue) {
+        expression = unaryExpression.expression; // avoid substitution
+        if (expression instanceof ParameterExpression) {
+          // avoid "optimization of" int t=1; t++; to 1++
+          return unaryExpression;
+        }
+      }
+      return super.visit(unaryExpression, expression);
+    }
+
+    @Override public Expression visit(BinaryExpression binaryExpression,
+        Expression expression0, Expression expression1) {
+      if (binaryExpression.getNodeType().modifiesLvalue) {
+        expression0 = binaryExpression.expression0; // avoid substitution
+        if (expression0 instanceof ParameterExpression) {
+          // If t is a declaration used only once, replace
+          //   int t;
+          //   int v = (t = 1) != a ? c : d;
+          // with
+          //   int v = 1 != a ? c : d;
+          if (map.containsKey(expression0)) {
+            return expression1.accept(this);
+          }
+        }
+      }
+      return super.visit(binaryExpression, expression0, expression1);
+    }
   }
 
   private static class UseCounter extends Visitor {
     private final Map<ParameterExpression, Slot> map =
-        new HashMap<ParameterExpression, Slot>();
+        new IdentityHashMap<ParameterExpression, Slot>();
 
+    @Override
     public Expression visit(ParameterExpression parameter) {
       final Slot slot = map.get(parameter);
       if (slot != null) {
@@ -375,17 +557,10 @@ public class BlockBuilder {
   }
 
   /**
-   * Workspace for optimization.
+   * Holds the number of times a declaration was used.
    */
   private static class Slot {
-    private final ParameterExpression parameter;
-    private final Expression expression;
     private int count;
-
-    public Slot(DeclarationStatement declarationStatement) {
-      this.parameter = declarationStatement.parameter;
-      this.expression = declarationStatement.initializer;
-    }
   }
 }
 

@@ -33,14 +33,16 @@ public class MemberExpression extends Expression {
 
   public MemberExpression(Expression expression, PseudoField field) {
     super(ExpressionType.MemberAccess, field.getType());
-    this.expression = expression;
-    this.field = field;
+    assert field != null : "field should not be null";
     assert expression != null || Modifier.isStatic(field.getModifiers())
         : "must specify expression if field is not static";
+    this.expression = expression;
+    this.field = field;
   }
 
   @Override
   public Expression accept(Visitor visitor) {
+    visitor = visitor.preVisit(this);
     Expression expression1 = expression == null
         ? null
         : expression.accept(visitor);
@@ -70,6 +72,39 @@ public class MemberExpression extends Expression {
       writer.append(field.getDeclaringClass());
     }
     writer.append('.').append(field.getName());
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+
+    MemberExpression that = (MemberExpression) o;
+
+    if (expression != null ? !expression.equals(that.expression) : that
+        .expression != null) {
+      return false;
+    }
+    if (!field.equals(that.field)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = super.hashCode();
+    result = 31 * result + (expression != null ? expression.hashCode() : 0);
+    result = 31 * result + field.hashCode();
+    return result;
   }
 }
 

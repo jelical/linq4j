@@ -15,31 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 */
-package net.hydromatic.linq4j.test;
-
-import net.hydromatic.linq4j.expressions.TypeTest;
-import net.hydromatic.linq4j.function.FunctionTest;
-
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-
 
 /**
- * Suite of all Linq4j tests.
+ * Examples of using linq4j.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-    PrimitiveTest.class,
-    Linq4jTest.class,
-    ExpressionTest.class,
-    OptimizerTest.class,
-    InlinerTest.class,
-    DeterministicTest.class,
-    BlockBuilderTest.class,
-    FunctionTest.class,
-    TypeTest.class
-})
-public class Linq4jSuite {
-}
+package com.example;
 
-// End Linq4jSuite.java
+// End package-info.java

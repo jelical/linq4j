@@ -17,17 +17,45 @@
 */
 package net.hydromatic.linq4j.expressions;
 
-/**
- * Represents a catch statement in a try block.
- */
-public class CatchBlock {
-  public final ParameterExpression parameter;
-  public final Statement body;
+import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 
-  public CatchBlock(ParameterExpression parameter,
-      Statement body) {
-    this.parameter = parameter;
-    this.body = body;
+/**
+ * Represents a length field of a RecordType
+ */
+public class ArrayLengthRecordField implements Types.RecordField {
+  private final String fieldName;
+  private final Class clazz;
+
+  public ArrayLengthRecordField(String fieldName, Class clazz) {
+    assert fieldName != null : "fieldName should not be null";
+    assert clazz != null : "clazz should not be null";
+    this.fieldName = fieldName;
+    this.clazz = clazz;
+  }
+
+  public boolean nullable() {
+    return false;
+  }
+
+  public String getName() {
+    return fieldName;
+  }
+
+  public Type getType() {
+    return int.class;
+  }
+
+  public int getModifiers() {
+    return 0;
+  }
+
+  public Object get(Object o) throws IllegalAccessException {
+    return Array.getLength(o);
+  }
+
+  public Type getDeclaringClass() {
+    return clazz;
   }
 
   @Override
@@ -39,13 +67,12 @@ public class CatchBlock {
       return false;
     }
 
-    CatchBlock that = (CatchBlock) o;
+    ArrayLengthRecordField that = (ArrayLengthRecordField) o;
 
-    if (body != null ? !body.equals(that.body) : that.body != null) {
+    if (!clazz.equals(that.clazz)) {
       return false;
     }
-    if (parameter != null ? !parameter.equals(that.parameter) : that
-        .parameter != null) {
+    if (!fieldName.equals(that.fieldName)) {
       return false;
     }
 
@@ -54,10 +81,8 @@ public class CatchBlock {
 
   @Override
   public int hashCode() {
-    int result = parameter != null ? parameter.hashCode() : 0;
-    result = 31 * result + (body != null ? body.hashCode() : 0);
+    int result = fieldName.hashCode();
+    result = 31 * result + clazz.hashCode();
     return result;
   }
 }
-
-// End CatchBlock.java

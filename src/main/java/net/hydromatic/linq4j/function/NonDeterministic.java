@@ -15,31 +15,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 */
-package net.hydromatic.linq4j.test;
+package net.hydromatic.linq4j.function;
 
-import net.hydromatic.linq4j.expressions.TypeTest;
-import net.hydromatic.linq4j.function.FunctionTest;
-
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Suite of all Linq4j tests.
+ * Specifies that function is NOT deterministic (i.e. it can return
+ * different output given the same inputs).
+ *
+ * The function is treated as non-deterministic even if {@code @Deterministic}
+ * annotation is present at class level.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-    PrimitiveTest.class,
-    Linq4jTest.class,
-    ExpressionTest.class,
-    OptimizerTest.class,
-    InlinerTest.class,
-    DeterministicTest.class,
-    BlockBuilderTest.class,
-    FunctionTest.class,
-    TypeTest.class
-})
-public class Linq4jSuite {
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.TYPE })
+public @interface NonDeterministic {
 }
 
-// End Linq4jSuite.java
+// End NonDeterministic.java

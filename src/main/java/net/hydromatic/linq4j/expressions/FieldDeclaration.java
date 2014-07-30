@@ -29,6 +29,7 @@ public class FieldDeclaration extends MemberDeclaration {
 
   public FieldDeclaration(int modifier, ParameterExpression parameter,
       Expression initializer) {
+    assert parameter != null : "parameter should not be null";
     this.modifier = modifier;
     this.parameter = parameter;
     this.initializer = initializer;
@@ -36,10 +37,11 @@ public class FieldDeclaration extends MemberDeclaration {
 
   @Override
   public MemberDeclaration accept(Visitor visitor) {
+    visitor = visitor.preVisit(this);
     // do not visit parameter - visit may not return a ParameterExpression
     final Expression initializer =
         this.initializer == null ? null : this.initializer.accept(visitor);
-    return visitor.visit(this, parameter, initializer);
+    return visitor.visit(this, initializer);
   }
 
   public void accept(ExpressionWriter writer) {
@@ -54,6 +56,39 @@ public class FieldDeclaration extends MemberDeclaration {
     }
     writer.append(';');
     writer.newlineAndIndent();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    FieldDeclaration that = (FieldDeclaration) o;
+
+    if (modifier != that.modifier) {
+      return false;
+    }
+    if (initializer != null ? !initializer.equals(that.initializer) : that
+        .initializer != null) {
+      return false;
+    }
+    if (!parameter.equals(that.parameter)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = modifier;
+    result = 31 * result + parameter.hashCode();
+    result = 31 * result + (initializer != null ? initializer.hashCode() : 0);
+    return result;
   }
 }
 

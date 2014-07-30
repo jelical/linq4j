@@ -74,15 +74,14 @@ public enum ExpressionType {
   AddChecked(" + ", false, 4, false),
 
   /**
-   * A bitwise or logical AND operation, such as (a &amp; b) in C# and
-   * (a And b) in Visual Basic.
+   * A bitwise or logical AND operation, such as {@code a &amp; b} in Java.
    */
   And(" & ", false, 8, false),
 
   /**
    * A conditional AND operation that evaluates the second operand
    * only if the first operand evaluates to true. It corresponds to
-   * (a && b) in C# and (a AndAlso b) in Visual Basic.
+   * {@code a && b} in Java.
    */
   AndAlso(" && ", false, 11, false),
 
@@ -94,12 +93,12 @@ public enum ExpressionType {
 
   /**
    * An indexing operation in a one-dimensional array, such as
-   * array[index] in C# or array(index) in Visual Basic.
+   * {@code array[index]} in Java.
    */
   ArrayIndex,
 
   /**
-   * A method call, such as in the obj.sampleMethod()
+   * A method call, such as in the {@code obj.sampleMethod()}
    * expression.
    */
   Call(".", false, 1, false),
@@ -111,8 +110,7 @@ public enum ExpressionType {
   Coalesce,
 
   /**
-   * A conditional operation, such as a > b ? a : b in C# or
-   * If(a > b, a, b) in Visual Basic.
+   * A conditional operation, such as {@code a > b ? a : b} in Java.
    */
   Conditional(" ? ", " : ", false, 13, true),
 
@@ -122,16 +120,16 @@ public enum ExpressionType {
   Constant,
 
   /**
-   * A cast or conversion operation, such as (SampleType)obj in
-   * C#or CType(obj, SampleType) in Visual Basic. For a numeric
+   * A cast or conversion operation, such as {@code (SampleType) obj} in
+   * Java. For a numeric
    * conversion, if the converted value is too large for the
    * destination type, no exception is thrown.
    */
   Convert(null, false, 2, true),
 
   /**
-   * A cast or conversion operation, such as (SampleType)obj in
-   * C#or CType(obj, SampleType) in Visual Basic. For a numeric
+   * A cast or conversion operation, such as {@code (SampleType) obj} in
+   * Java. For a numeric
    * conversion, if the converted value does not fit the
    * destination type, an exception is thrown.
    */
@@ -144,14 +142,13 @@ public enum ExpressionType {
   Divide(" / ", false, 3, false),
 
   /**
-   * A node that represents an equality comparison, such as (a
-   * == b) in C# or (a = b) in Visual Basic.
+   * A node that represents an equality comparison, such as {@code a == b} in
+   * Java.
    */
   Equal(" == ", false, 7, false),
 
   /**
-   * A bitwise or logical XOR operation, such as (a ^ b) in C#
-   * or (a Xor b) in Visual Basic.
+   * A bitwise or logical XOR operation, such as {@code a ^ b} in Java.
    */
   ExclusiveOr(" ^ ", false, 9, false),
 
@@ -173,13 +170,12 @@ public enum ExpressionType {
   Invoke,
 
   /**
-   * A lambda expression, such as a =&gt; a + a in C# or
-   * Function(a) a + a in Visual Basic.
+   * A lambda expression, such as {@code a -&gt; a + a} in Java.
    */
   Lambda,
 
   /**
-   * A bitwise left-shift operation, such as (a &lt;&lt; b).
+   * A bitwise left-shift operation, such as {@code a << b} in Java.
    */
   LeftShift(" << ", false, 5, false),
 
@@ -357,7 +353,7 @@ public enum ExpressionType {
   /**
    * An assignment operation, such as (a = b).
    */
-  Assign(" = ", false, 14, true),
+  Assign(" = ", null, false, 14, true, true),
 
   /**
    * A block of expressions.
@@ -453,49 +449,49 @@ public enum ExpressionType {
    * An addition compound assignment operation, such as (a +=
    * b), without overflow checking, for numeric operands.
    */
-  AddAssign(" += ", false, 14, true),
+  AddAssign(" += ", null, false, 14, true, true),
 
   /**
    * A bitwise or logical AND compound assignment operation,
    * such as (a &amp;= b) in C#.
    */
-  AndAssign(" &= ", false, 14, true),
+  AndAssign(" &= ", null, false, 14, true, true),
 
   /**
    * An division compound assignment operation, such as (a /=
    * b), for numeric operands.
    */
-  DivideAssign(" /= ", false, 14, true),
+  DivideAssign(" /= ", null, false, 14, true, true),
 
   /**
    * A bitwise or logical XOR compound assignment operation,
    * such as (a ^= b) in C#.
    */
-  ExclusiveOrAssign(" ^= ", false, 14, true),
+  ExclusiveOrAssign(" ^= ", null, false, 14, true, true),
 
   /**
    * A bitwise left-shift compound assignment, such as (a &lt;&lt;=
    * b).
    */
-  LeftShiftAssign(" <<= ", false, 14, true),
+  LeftShiftAssign(" <<= ", null, false, 14, true, true),
 
   /**
    * An arithmetic remainder compound assignment operation,
    * such as (a %= b) in C#.
    */
-  ModuloAssign(" %= ", false, 14, true),
+  ModuloAssign(" %= ", null, false, 14, true, true),
 
   /**
    * A multiplication compound assignment operation, such as (a
    * *= b), without overflow checking, for numeric operands.
    */
-  MultiplyAssign(" *= ", false, 14, true),
+  MultiplyAssign(" *= ", null, false, 14, true, true),
 
   /**
    * A bitwise or logical OR compound assignment, such as (a |=
    * b) in C#.
    */
-  OrAssign(" |= ", false, 14, true),
+  OrAssign(" |= ", null, false, 14, true, true),
 
   /**
    * A compound assignment operation that raises a number to a
@@ -507,55 +503,55 @@ public enum ExpressionType {
    * A bitwise right-shift compound assignment operation, such
    * as (a &gt;&gt;= b).
    */
-  RightShiftAssign(" >>= ", false, 14, true),
+  RightShiftAssign(" >>= ", null, false, 14, true, true),
 
   /**
    * A subtraction compound assignment operation, such as (a -=
    * b), without overflow checking, for numeric operands.
    */
-  SubtractAssign(" -= ", false, 14, true),
+  SubtractAssign(" -= ", null, false, 14, true, true),
 
   /**
    * An addition compound assignment operation, such as (a +=
    * b), with overflow checking, for numeric operands.
    */
-  AddAssignChecked(" += ", false, 14, true),
+  AddAssignChecked(" += ", null, false, 14, true),
 
   /**
    * A multiplication compound assignment operation, such as (a
    * *= b), that has overflow checking, for numeric operands.
    */
-  MultiplyAssignChecked(" *= ", false, 14, true),
+  MultiplyAssignChecked(" *= ", null, false, 14, true, true),
 
   /**
    * A subtraction compound assignment operation, such as (a -=
    * b), that has overflow checking, for numeric operands.
    */
-  SubtractAssignChecked(" -= ", false, 14, true),
+  SubtractAssignChecked(" -= ", null, false, 14, true, true),
 
   /**
    * A unary prefix increment, such as (++a). The object a
    * should be modified in place.
    */
-  PreIncrementAssign("++", false, 2, true),
+  PreIncrementAssign("++", null, false, 2, true, true),
 
   /**
    * A unary prefix decrement, such as (--a). The object a
    * should be modified in place.
    */
-  PreDecrementAssign("--", false, 2, true),
+  PreDecrementAssign("--", null, false, 2, true, true),
 
   /**
    * A unary postfix increment, such as (a++). The object a
    * should be modified in place.
    */
-  PostIncrementAssign("++", true, 2, true),
+  PostIncrementAssign("++", null, true, 2, true, true),
 
   /**
    * A unary postfix decrement, such as (a--). The object a
    * should be modified in place.
    */
-  PostDecrementAssign("--", true, 2, true),
+  PostDecrementAssign("--", null, true, 2, true, true),
 
   /**
    * An exact type test.
@@ -591,6 +587,7 @@ public enum ExpressionType {
   final boolean postfix;
   final int lprec;
   final int rprec;
+  final boolean modifiesLvalue;
 
   ExpressionType() {
     this(null, false, 0, false);
@@ -602,9 +599,15 @@ public enum ExpressionType {
 
   ExpressionType(String op, String op2, boolean postfix, int prec,
       boolean right) {
+    this(op, op2, postfix, prec, right, false);
+  }
+
+  ExpressionType(String op, String op2, boolean postfix, int prec,
+      boolean right, boolean modifiesLvalue) {
     this.op = op;
     this.op2 = op2;
     this.postfix = postfix;
+    this.modifiesLvalue = modifiesLvalue;
     this.lprec = (20 - prec) * 2 + (right ? 1 : 0);
     this.rprec = (20 - prec) * 2 + (right ? 0 : 1);
   }
